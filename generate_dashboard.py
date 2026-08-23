@@ -473,12 +473,33 @@ def main():
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Weekly Marketing Dashboard — {esc(week_label(week_start, week_end))}</title>
+<title>Ads Performance Dashboard</title>
 <style>
   :root {{
     --bg: #f7f8fa; --card-bg: #ffffff; --border: #e2e5ea; --text: #1a1d24;
     --text-muted: #6b7280; --accent: #2563eb; --up: #16a34a; --down: #dc2626;
-    --flat: #6b7280; --na: #9ca3af; --table-head: #f1f3f6;
+    --flat: #6b7280; --na: #9ca3af; --table-head: #f1f3f6; --row-hover: #fafbfc;
+    --accent-soft: rgba(37,99,235,.08); --accent-soft-strong: rgba(37,99,235,.16);
+    --up-soft: rgba(22,163,74,.1); --down-soft: rgba(220,38,38,.1); --flat-soft: rgba(107,114,128,.1);
+    --status-enabled-bg: rgba(22,163,74,.12); --status-paused-bg: rgba(107,114,128,.12);
+  }}
+  @media (prefers-color-scheme: dark) {{
+    :root:not([data-theme="light"]) {{
+      --bg: #12151b; --card-bg: #1b1f27; --border: #2b303b; --text: #e7e9ee;
+      --text-muted: #9aa2b1; --accent: #5b8cff; --up: #34d399; --down: #f87171;
+      --flat: #9aa2b1; --na: #6b7280; --table-head: #20242e; --row-hover: #20242e;
+      --accent-soft: rgba(91,140,255,.14); --accent-soft-strong: rgba(91,140,255,.24);
+      --up-soft: rgba(52,211,153,.14); --down-soft: rgba(248,113,113,.14); --flat-soft: rgba(154,162,177,.14);
+      --status-enabled-bg: rgba(52,211,153,.16); --status-paused-bg: rgba(154,162,177,.16);
+    }}
+  }}
+  :root[data-theme="dark"] {{
+    --bg: #12151b; --card-bg: #1b1f27; --border: #2b303b; --text: #e7e9ee;
+    --text-muted: #9aa2b1; --accent: #5b8cff; --up: #34d399; --down: #f87171;
+    --flat: #9aa2b1; --na: #6b7280; --table-head: #20242e; --row-hover: #20242e;
+    --accent-soft: rgba(91,140,255,.14); --accent-soft-strong: rgba(91,140,255,.24);
+    --up-soft: rgba(52,211,153,.14); --down-soft: rgba(248,113,113,.14); --flat-soft: rgba(154,162,177,.14);
+    --status-enabled-bg: rgba(52,211,153,.16); --status-paused-bg: rgba(154,162,177,.16);
   }}
   * {{ box-sizing: border-box; }}
   body {{ margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
@@ -503,9 +524,9 @@ def main():
 
   .sub-nav {{ position: sticky; top: 45px; z-index: 15; background: var(--bg); display: flex; flex-wrap: wrap;
               gap: 8px; padding: 8px 0 16px; }}
-  .sub-nav a {{ font-size: 12.5px; font-weight: 600; color: var(--accent); background: rgba(37,99,235,.08);
+  .sub-nav a {{ font-size: 12.5px; font-weight: 600; color: var(--accent); background: var(--accent-soft);
               padding: 5px 12px; border-radius: 999px; text-decoration: none; }}
-  .sub-nav a:hover {{ background: rgba(37,99,235,.16); }}
+  .sub-nav a:hover {{ background: var(--accent-soft-strong); }}
 
   .top-section {{ display: none; }}
   .top-section.active {{ display: block; }}
@@ -525,22 +546,25 @@ def main():
   .kpi-value {{ font-size: 20px; font-weight: 700; margin: 5px 0 4px; }}
   .kpi-sub {{ font-size: 11px; color: var(--text-muted); margin-top: 2px; }}
   .wow {{ font-size: 12px; font-weight: 600; padding: 2px 6px; border-radius: 4px; display: inline-block; }}
-  .wow-up {{ color: var(--up); background: rgba(22,163,74,.1); }}
-  .wow-down {{ color: var(--down); background: rgba(220,38,38,.1); }}
-  .wow-flat {{ color: var(--flat); background: rgba(107,114,128,.1); }}
+  .wow-up {{ color: var(--up); background: var(--up-soft); }}
+  .wow-down {{ color: var(--down); background: var(--down-soft); }}
+  .wow-flat {{ color: var(--flat); background: var(--flat-soft); }}
   .wow-na {{ color: var(--na); }}
   table {{ width: 100%; border-collapse: collapse; background: var(--card-bg); border: 1px solid var(--border);
            border-radius: 8px; overflow: hidden; font-size: 13px; }}
   thead th {{ background: var(--table-head); text-align: left; padding: 9px 11px; font-weight: 600;
               border-bottom: 1px solid var(--border); white-space: nowrap; }}
+  thead th.sortable-th {{ cursor: pointer; user-select: none; }}
+  thead th.sortable-th:hover {{ background: var(--accent-soft); }}
+  .sort-indicator {{ display: inline-block; width: 1.1em; font-size: 10px; color: var(--accent); }}
   tbody td {{ padding: 7px 11px; border-bottom: 1px solid var(--border); }}
   tbody tr:last-child td {{ border-bottom: none; }}
-  tbody tr:hover {{ background: #fafbfc; }}
+  tbody tr:hover {{ background: var(--row-hover); }}
   td.num, th.num {{ text-align: right; font-variant-numeric: tabular-nums; }}
   .table-scroll {{ overflow-x: auto; }}
   .status {{ padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; white-space: nowrap; }}
-  .status-enabled {{ background: rgba(22,163,74,.12); color: var(--up); }}
-  .status-paused {{ background: rgba(107,114,128,.12); color: var(--flat); }}
+  .status-enabled {{ background: var(--status-enabled-bg); color: var(--up); }}
+  .status-paused {{ background: var(--status-paused-bg); color: var(--flat); }}
   .note {{ font-size: 12.5px; color: var(--text-muted); font-style: italic; margin: 2px 0 10px; }}
 </style>
 </head>
@@ -673,6 +697,95 @@ def main():
       document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
     }});
   }});
+
+  // Sortable tables: click a header to cycle ascending -> descending -> unsorted.
+  // Every table defaults to descending by its Impressions column on load.
+  function parseCellValue(cell) {{
+    var text = cell.textContent.trim();
+    if (text === '' || text === '—') return null;
+    var isNegative = text.indexOf('▼') !== -1;
+    var cleaned = text.replace(/[▲▼▪$,%]/g, '').trim();
+    if (cleaned !== '' && /^-?[0-9.]+$/.test(cleaned)) {{
+      var num = parseFloat(cleaned);
+      return isNegative ? -Math.abs(num) : num;
+    }}
+    return text.toLowerCase();
+  }}
+
+  function compareRows(a, b, colIndex, dir) {{
+    var va = parseCellValue(a.children[colIndex]);
+    var vb = parseCellValue(b.children[colIndex]);
+    if (va === null && vb === null) return 0;
+    if (va === null) return 1;
+    if (vb === null) return -1;
+    var cmp = (typeof va === 'number' && typeof vb === 'number')
+      ? va - vb
+      : String(va).localeCompare(String(vb));
+    return dir === 'asc' ? cmp : -cmp;
+  }}
+
+  function initSortableTables() {{
+    document.querySelectorAll('table').forEach(function(table) {{
+      var thead = table.querySelector('thead');
+      var tbody = table.querySelector('tbody');
+      if (!thead || !tbody) return;
+      var ths = Array.prototype.slice.call(thead.querySelectorAll('th'));
+      if (!ths.length) return;
+      var headerTexts = ths.map(function(th) {{ return th.textContent.trim(); }});
+      var originalRows = Array.prototype.slice.call(tbody.querySelectorAll('tr'));
+      var state = {{ col: -1, dir: 'none' }};
+
+      function applySort(colIndex, dir) {{
+        if (dir === 'none') {{
+          originalRows.forEach(function(r) {{ tbody.appendChild(r); }});
+          return;
+        }}
+        var rows = Array.prototype.slice.call(tbody.querySelectorAll('tr'));
+        rows.sort(function(a, b) {{ return compareRows(a, b, colIndex, dir); }});
+        rows.forEach(function(r) {{ tbody.appendChild(r); }});
+      }}
+
+      function updateIndicators() {{
+        ths.forEach(function(th, idx) {{
+          var ind = th.querySelector('.sort-indicator');
+          if (!ind) return;
+          if (state.col === idx && state.dir !== 'none') {{
+            ind.textContent = state.dir === 'asc' ? '▲' : '▼';
+          }} else {{
+            ind.textContent = '';
+          }}
+        }});
+      }}
+
+      ths.forEach(function(th, idx) {{
+        th.classList.add('sortable-th');
+        var indicator = document.createElement('span');
+        indicator.className = 'sort-indicator';
+        th.appendChild(indicator);
+        th.addEventListener('click', function() {{
+          if (state.col !== idx) {{
+            state = {{ col: idx, dir: 'asc' }};
+          }} else if (state.dir === 'asc') {{
+            state = {{ col: idx, dir: 'desc' }};
+          }} else if (state.dir === 'desc') {{
+            state = {{ col: -1, dir: 'none' }};
+          }} else {{
+            state = {{ col: idx, dir: 'asc' }};
+          }}
+          applySort(idx, state.dir);
+          updateIndicators();
+        }});
+      }});
+
+      var defaultCol = headerTexts.indexOf('Impressions');
+      if (defaultCol >= 0) {{
+        state = {{ col: defaultCol, dir: 'desc' }};
+        applySort(defaultCol, 'desc');
+        updateIndicators();
+      }}
+    }});
+  }}
+  initSortableTables();
 </script>
 </body>
 </html>"""
