@@ -6,15 +6,17 @@ schema from data-mapping.md, and aggregate Google Ads to weekly grain.
 Usage:
     python3 merge.py <csv_dir> <google_ads_raw.json> <week_start> <week_end> <out_unified.json>
 
-<csv_dir> must contain the 4 files named:
+<csv_dir> must contain these 3 files named:
     linkedinads_campaignperformance.csv
     linkedinads_creativeperformance.csv
-    linkedinads_creativeplacement.csv
     linkedinads_demographic.csv
+plus an optional linkedinads_creativeplacement.csv (parsed if present, but
+no longer shown on the dashboard, so not required).
 (already decoded from LinkedIn's UTF-16LE export to UTF-8)
 """
 import csv
 import json
+import os
 import sys
 
 
@@ -363,11 +365,19 @@ def main():
         ["Campaign ID", "Ad ID", "Total Spent"],
         "linkedin_creative", week_start, week_end, warnings,
     )
-    creative_placement = parse_ad_set_or_creative_file(
-        f"{csv_dir}/linkedinads_creativeplacement.csv",
-        ["Campaign ID", "Ad ID", "Placement", "Total Spent"],
-        "linkedin_placement", week_start, week_end, warnings,
-    )
+    placement_path = f"{csv_dir}/linkedinads_creativeplacement.csv"
+    if os.path.exists(placement_path):
+        creative_placement = parse_ad_set_or_creative_file(
+            placement_path,
+            ["Campaign ID", "Ad ID", "Placement", "Total Spent"],
+            "linkedin_placement", week_start, week_end, warnings,
+        )
+    else:
+        creative_placement = []
+        warnings.append(
+            "linkedinads_creativeplacement.csv not provided this week -- "
+            "skipped (Creative Placement is no longer shown on the dashboard)."
+        )
     demographics = parse_demographics(
         f"{csv_dir}/linkedinads_demographic.csv", week_start, week_end, warnings,
     )
@@ -377,8 +387,25 @@ def main():
     google_ads_geo = aggregate_ga_geo(ga_geo_path, week_start, week_end)
     google_ads_searchterm = aggregate_ga_search_terms(ga_searchterm_path, week_start, week_end)
 
+    # The dashboard only ever shows the top N search terms by spend (dashboard-spec.md).
+    # Trim here so the per-week snapshot stored in Drive stays small -- most raw search
+    # term rows are near-zero spend and would otherwise dominate the file.
+    SEARCH_TERM_TOP_N = 50
+    search_term_total = len(google_ads_searchterm)
+    google_ads_searchterm.sort(key=lambda r: r["spend"], reverse=True)
+    search_term_omitted = max(0, search_term_total - SEARCH_TERM_TOP_N)
+    google_ads_searchterm = google_ads_searchterm[:SEARCH_TERM_TOP_N]
+    if search_term_omitted:
+        warnings.append(
+            f"Search Term Performance: kept top {SEARCH_TERM_TOP_N} of "
+            f"{search_term_total} rows by spend ({search_term_omitted} omitted)."
+        )
+
+    # Creative Placement is parsed (when the optional CSV is present) only to report a
+    # row count -- it isn't rendered anywhere on the dashboard, so it's excluded from
+    # the stored records to keep the per-week snapshot small.
     all_records = (
-        campaign_perf + creative_perf + creative_placement + demographics + google_ads
+        campaign_perf + creative_perf + demographics + google_ads
         + google_ads_adgroup + google_ads_keyword + google_ads_geo + google_ads_searchterm
     )
 
