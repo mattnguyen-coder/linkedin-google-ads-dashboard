@@ -36,7 +36,9 @@ def num(s):
     if s is None or s in _NA_VALUES:
         return None
     try:
-        return float(s)
+        # LinkedIn exports can contain thousands separators ("1,420.80"); without
+        # stripping them, values >= 1000 silently parse to None.
+        return float(s.replace(",", ""))
     except ValueError:
         return None
 
@@ -298,7 +300,7 @@ def aggregate_ga_keywords(raw_path, week_start, week_end):
     rows = rows["result"] if isinstance(rows, dict) else rows
     return _aggregate_daily_to_weekly(
         rows,
-        key_fn=lambda r: r["ad_group_criterion.criterion_id"],
+        key_fn=lambda r: (r["campaign.id"], r["ad_group.name"], r["ad_group_criterion.criterion_id"]),  # criterion_id alone repeats across ad groups
         base_fields_fn=lambda r: {
             "campaign_id": r["campaign.id"], "campaign_name": r["campaign.name"],
             "ad_group_name": r["ad_group.name"],
@@ -350,9 +352,116 @@ def aggregate_ga_search_terms(raw_path, week_start, week_end):
     )
 
 
+def _ratios(spend, impressions, clicks):
+    """Derive CTR (%), CPC and CPM from raw totals. ChatGPT's own cpc/cpm columns
+    don't reconcile with spend/clicks and spend/impressions, so they're not used."""
+    ctr = round(clicks / impressions * 100, 4) if impressions else 0.0
+    cpc = round(spend / clicks, 4) if clicks else 0.0
+    cpm = round(spend / impressions * 1000, 4) if impressions else 0.0
+    return ctr, cpc, cpm
+
+
+def _read_utf8_csv(path):
+    with open(path, "r", newline="", encoding="utf-8-sig") as f:
+        return list(csv.DictReader(f))
+
+
+def parse_chatgpt_ads(path, week_start, week_end, warnings):
+    """ChatGPT Ads ad-level export (openaiads_ads_*.csv) -> chatgpt_ad records."""
+    records = []
+    for r in _read_utf8_csv(path):
+        spend, impressions, clicks = num(r["spend"]) or 0.0, num(r["impressions"]) or 0.0, num(r["clicks"]) or 0.0
+        ctr, cpc, cpm = _ratios(spend, impressions, clicks)
+        records.append({
+            "table_type": "chatgpt_ad",
+            "platform": "chatgpt",
+            "date_range_start": week_start,
+            "date_range_end": week_end,
+            "campaign_name": r["campaign_name"],
+            "ad_group_name": r["ad_group_name"],
+            "ad_name": r["ad_name"],
+            "ad_status": r["ad_status"],
+            "review_status": r["review_status"],
+            "ad_title": r["ad_title"],
+            "ad_copy": r["ad_copy"],
+            "ad_url": r["ad_url"],
+            "spend": round(spend, 2),
+            "impressions": impressions,
+            "clicks": clicks,
+            "conversions": num(r["conversions"]) or 0.0,
+            "ctr": ctr, "cpc": cpc, "cpm": cpm,
+            # No ChatGPT history yet (first tracked week) -- WoW stays blank.
+            "spend_prior_period": None, "impressions_prior_period": None,
+            "clicks_prior_period": None, "conversions_prior_period": None,
+            "wow_spend_change_pct": None,
+        })
+    return records
+
+
+def parse_chatgpt_adgroups(path, week_start, week_end, warnings):
+    """ChatGPT Ads ad-group export (openaiads_adgroups_*.csv) -> chatgpt_adgroup records."""
+    records = []
+    for r in _read_utf8_csv(path):
+        spend, impressions, clicks = num(r["spend"]) or 0.0, num(r["impressions"]) or 0.0, num(r["clicks"]) or 0.0
+        ctr, cpc, cpm = _ratios(spend, impressions, clicks)
+        records.append({
+            "table_type": "chatgpt_adgroup",
+            "platform": "chatgpt",
+            "date_range_start": week_start,
+            "date_range_end": week_end,
+            "campaign_name": r["campaign_name"],
+            "ad_group_name": r["ad_group_name"],
+            "ad_group_status": r["ad_group_status"],
+            "billing_event_type": r.get("billing_event_type"),
+            "max_bid": num(r.get("max_bid")),
+            "spend": round(spend, 2),
+            "impressions": impressions,
+            "clicks": clicks,
+            "conversions": num(r["conversions"]) or 0.0,
+            "ctr": ctr, "cpc": cpc, "cpm": cpm,
+            "spend_prior_period": None, "impressions_prior_period": None,
+            "clicks_prior_period": None, "conversions_prior_period": None,
+            "wow_spend_change_pct": None,
+        })
+    return records
+
+
+def apply_chatgpt_prior(records, prior_snapshot_path, warnings):
+    """Fill *_prior_period and wow_spend_change_pct on ChatGPT records from the previous
+    week's snapshot (ChatGPT exports carry no compare columns, unlike LinkedIn)."""
+    if not prior_snapshot_path or not os.path.exists(prior_snapshot_path):
+        return
+    with open(prior_snapshot_path, "r", encoding="utf-8") as f:
+        prior = json.load(f)
+    key = {"chatgpt_ad": lambda r: (r["ad_group_name"], r["ad_name"]),
+           "chatgpt_adgroup": lambda r: (r["ad_group_name"],)}
+    prior_by = {}
+    for r in prior["records"]:
+        if r["table_type"] in key:
+            prior_by[(r["table_type"], key[r["table_type"]](r))] = r
+    if not prior_by:
+        warnings.append("ChatGPT Ads: prior snapshot has no ChatGPT records -- WoW left blank.")
+        return
+    for r in records:
+        p = prior_by.get((r["table_type"], key[r["table_type"]](r)))
+        # An ad that did not exist last week counts as 0 prior spend (WoW stays blank, totals stay comparable).
+        r["spend_prior_period"] = p["spend"] if p else 0.0
+        r["impressions_prior_period"] = p["impressions"] if p else 0.0
+        r["clicks_prior_period"] = p["clicks"] if p else 0.0
+        r["conversions_prior_period"] = p["conversions"] if p else 0.0
+        r["wow_spend_change_pct"] = (
+            round((r["spend"] - p["spend"]) / p["spend"] * 100, 2) if p and p["spend"] else None
+        )
+
+
 def main():
     (csv_dir, ga_raw_path, ga_adgroup_path, ga_keyword_path, ga_geo_path,
      ga_searchterm_path, week_start, week_end, out_path) = sys.argv[1:10]
+    # Optional: ChatGPT Ads exports (openaiads_ads_*.csv, openaiads_adgroups_*.csv)
+    chatgpt_ads_path = sys.argv[10] if len(sys.argv) > 10 else None
+    chatgpt_adgroups_path = sys.argv[11] if len(sys.argv) > 11 else None
+    # Optional: previous week's snapshot_*.json, used to fill ChatGPT prior-period values.
+    prior_snapshot_path = sys.argv[12] if len(sys.argv) > 12 else None
     warnings = []
 
     campaign_perf = parse_ad_set_or_creative_file(
@@ -404,9 +513,32 @@ def main():
     # Creative Placement is parsed (when the optional CSV is present) only to report a
     # row count -- it isn't rendered anywhere on the dashboard, so it's excluded from
     # the stored records to keep the per-week snapshot small.
+    chatgpt_ads = parse_chatgpt_ads(chatgpt_ads_path, week_start, week_end, warnings) if chatgpt_ads_path else []
+    chatgpt_adgroups = (
+        parse_chatgpt_adgroups(chatgpt_adgroups_path, week_start, week_end, warnings)
+        if chatgpt_adgroups_path else []
+    )
+    if chatgpt_ads or chatgpt_adgroups:
+        apply_chatgpt_prior(chatgpt_ads + chatgpt_adgroups, prior_snapshot_path, warnings)
+        if not prior_snapshot_path:
+            warnings.append(
+                "ChatGPT Ads: first tracked week -- no prior-week data, so ChatGPT week-over-week is blank."
+            )
+        warnings.append(
+            "ChatGPT Ads: CTR/CPC/CPM are derived from spend, impressions and clicks (export's cpc/cpm columns not used)."
+        )
+        if chatgpt_ads and chatgpt_adgroups:
+            ad_spend = round(sum(r["spend"] for r in chatgpt_ads), 2)
+            grp_spend = round(sum(r["spend"] for r in chatgpt_adgroups), 2)
+            if abs(ad_spend - grp_spend) > 0.01:
+                warnings.append(
+                    f"ChatGPT Ads: ad-level spend ${ad_spend:,.2f} does not match ad-group spend ${grp_spend:,.2f}."
+                )
+
     all_records = (
         campaign_perf + creative_perf + demographics + google_ads
         + google_ads_adgroup + google_ads_keyword + google_ads_geo + google_ads_searchterm
+        + chatgpt_ads + chatgpt_adgroups
     )
 
     out = {
@@ -423,6 +555,8 @@ def main():
                 "google_ads_keyword": len(google_ads_keyword),
                 "google_ads_geo": len(google_ads_geo),
                 "google_ads_searchterm": len(google_ads_searchterm),
+                "chatgpt_ad": len(chatgpt_ads),
+                "chatgpt_adgroup": len(chatgpt_adgroups),
             },
             "warnings": warnings,
         },
