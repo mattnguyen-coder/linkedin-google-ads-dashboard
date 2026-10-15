@@ -1,0 +1,1181 @@
+<title>Ads Performance Dashboard</title>
+<style>
+  :root {
+    --bg: #f7f8fa; --card-bg: #ffffff; --border: #e2e5ea; --text: #1a1d24;
+    --text-muted: #6b7280; --accent: #2563eb; --up: #16a34a; --down: #dc2626;
+    --flat: #6b7280; --na: #9ca3af; --table-head: #f1f3f6; --row-hover: #fafbfc;
+    --accent-soft: rgba(37,99,235,.08); --accent-soft-strong: rgba(37,99,235,.16);
+    --up-soft: rgba(22,163,74,.1); --down-soft: rgba(220,38,38,.1); --flat-soft: rgba(107,114,128,.1);
+    --status-enabled-bg: rgba(22,163,74,.12); --status-paused-bg: rgba(107,114,128,.12);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #12151b; --card-bg: #1b1f27; --border: #2b303b; --text: #e7e9ee;
+      --text-muted: #9aa2b1; --accent: #5b8cff; --up: #34d399; --down: #f87171;
+      --flat: #9aa2b1; --na: #6b7280; --table-head: #20242e; --row-hover: #20242e;
+      --accent-soft: rgba(91,140,255,.14); --accent-soft-strong: rgba(91,140,255,.24);
+      --up-soft: rgba(52,211,153,.14); --down-soft: rgba(248,113,113,.14); --flat-soft: rgba(154,162,177,.14);
+      --status-enabled-bg: rgba(52,211,153,.16); --status-paused-bg: rgba(154,162,177,.16);
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #12151b; --card-bg: #1b1f27; --border: #2b303b; --text: #e7e9ee;
+    --text-muted: #9aa2b1; --accent: #5b8cff; --up: #34d399; --down: #f87171;
+    --flat: #9aa2b1; --na: #6b7280; --table-head: #20242e; --row-hover: #20242e;
+    --accent-soft: rgba(91,140,255,.14); --accent-soft-strong: rgba(91,140,255,.24);
+    --up-soft: rgba(52,211,153,.14); --down-soft: rgba(248,113,113,.14); --flat-soft: rgba(154,162,177,.14);
+    --status-enabled-bg: rgba(52,211,153,.16); --status-paused-bg: rgba(154,162,177,.16);
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+          background: var(--bg); color: var(--text); }
+  .page { max-width: 1280px; margin: 0 auto; padding: 0 24px 80px; }
+  header.report-header { display: flex; justify-content: space-between; align-items: flex-start;
+          padding: 24px 0 20px; border-bottom: 1px solid var(--border); margin-bottom: 0; flex-wrap: wrap; gap: 16px; }
+  header.report-header h1 { font-size: 22px; margin: 0 0 4px; }
+  header.report-header .week-range { font-size: 15px; color: var(--text-muted); }
+  header.report-header .last-updated { font-size: 13px; color: var(--text-muted); margin-top: 6px; }
+
+  .week-select-wrap { text-align: right; }
+  .week-select-wrap label { display: block; font-size: 11px; color: var(--text-muted); margin-bottom: 4px; text-transform: uppercase; letter-spacing: .03em; }
+  .week-select-wrap select { font: inherit; font-size: 13.5px; padding: 7px 10px; border-radius: 6px;
+          border: 1px solid var(--border); background: var(--card-bg); color: var(--text); min-width: 200px; }
+  .week-select-wrap select:disabled { opacity: .55; cursor: not-allowed; }
+
+  .status-banner { border-radius: 8px; padding: 10px 14px; font-size: 13px; margin: 14px 0; }
+  .status-banner.info { background: var(--accent-soft); color: var(--accent); }
+  .status-banner.error { background: var(--down-soft); color: var(--down); }
+
+  .top-nav { flex-wrap: wrap; position: sticky; top: 0; z-index: 20; background: var(--bg); display: flex; gap: 4px;
+              border-bottom: 1px solid var(--border); padding-top: 10px; margin-bottom: 20px; }
+  .top-nav button { background: none; border: none; font: inherit; font-weight: 600; font-size: 14.5px;
+              color: var(--text-muted); padding: 10px 18px; border-bottom: 3px solid transparent; cursor: pointer; }
+  .top-nav button.active { color: var(--accent); border-bottom-color: var(--accent); }
+  .top-nav button:hover { color: var(--text); }
+
+  .sub-nav { position: sticky; top: 45px; z-index: 15; background: var(--bg); display: flex; flex-wrap: wrap;
+              gap: 8px; padding: 8px 0 16px; }
+  .sub-nav a { font-size: 12.5px; font-weight: 600; color: var(--accent); background: var(--accent-soft);
+              padding: 5px 12px; border-radius: 999px; text-decoration: none; }
+  .sub-nav a:hover { background: var(--accent-soft-strong); }
+
+  .top-section { display: none; }
+  .top-section.active { display: block; }
+
+  .topic { margin-bottom: 40px; scroll-margin-top: 100px; }
+  .topic h3 { font-size: 16px; margin: 0 0 6px; }
+  .subblock { margin-bottom: 28px; }
+  .subblock h4 { font-size: 12.5px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .04em; margin: 0 0 10px; }
+
+  h2.exec-summary-title { font-size: 17px; border-left: 4px solid var(--accent); padding-left: 10px; margin-bottom: 12px; }
+  .exec-summary-box { background: var(--card-bg); border: 1px solid var(--border); border-radius: 10px;
+              padding: 18px 20px; font-size: 14.5px; line-height: 1.6; margin-bottom: 32px; }
+
+  .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 8px; }
+  .kpi-card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 10px; padding: 14px; }
+  .kpi-label { font-size: 11.5px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .03em; }
+  .kpi-value { font-size: 20px; font-weight: 700; margin: 5px 0 4px; }
+  .kpi-sub { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+  .wow { font-size: 12px; font-weight: 600; padding: 2px 6px; border-radius: 4px; display: inline-block; }
+  .wow-up { color: var(--up); background: var(--up-soft); }
+  .wow-down { color: var(--down); background: var(--down-soft); }
+  .wow-flat { color: var(--flat); background: var(--flat-soft); }
+  .wow-na { color: var(--na); }
+  table { width: 100%; border-collapse: collapse; background: var(--card-bg); border: 1px solid var(--border);
+           border-radius: 8px; overflow: hidden; font-size: 13px; }
+  thead th { background: var(--table-head); text-align: left; padding: 9px 11px; font-weight: 600;
+              border-bottom: 1px solid var(--border); white-space: nowrap; }
+  thead th.sortable-th { cursor: pointer; user-select: none; }
+  thead th.sortable-th:hover { background: var(--accent-soft); }
+  .sort-indicator { display: inline-block; width: 1.1em; font-size: 10px; color: var(--accent); }
+  tbody td { padding: 7px 11px; border-bottom: 1px solid var(--border); }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr:hover { background: var(--row-hover); }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .table-scroll { overflow-x: auto; }
+  .status { padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; white-space: nowrap; }
+  .status-enabled { background: var(--status-enabled-bg); color: var(--up); }
+  .status-paused { background: var(--status-paused-bg); color: var(--flat); }
+  .status-active { background: var(--status-enabled-bg); color: var(--up); }
+  .asof { font-size: 13px; color: var(--text-muted); margin: 0 0 14px; }
+  .cell-clip { min-width: 220px; max-width: 360px; white-space: normal; color: var(--text-muted); font-size: 12px; line-height: 1.4; }
+  .mix-bar { display: flex; gap: 2px; height: 14px; border-radius: 4px; overflow: hidden; background: var(--table-head); }
+  .mix-seg { min-width: 2px; }
+  .mix-legend { display: flex; flex-wrap: wrap; gap: 8px 24px; margin-top: 12px; font-size: 13px; }
+  .mix-legend span.sw { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; }
+  .mix-legend .mix-val { color: var(--text-muted); font-variant-numeric: tabular-nums; }
+  .note { font-size: 12.5px; color: var(--text-muted); font-style: italic; margin: 2px 0 10px; }
+  .skeleton-text { color: var(--text-muted); font-style: italic; font-size: 13px; }
+</style>
+<div class="page">
+  <header class="report-header">
+    <div>
+      <h1>Weekly Marketing Dashboard</h1>
+      <div class="week-range" id="week-range">Loading…</div>
+      <div class="last-updated" id="last-updated"></div>
+    </div>
+    <div class="week-select-wrap">
+      <label for="week-select">Week</label>
+      <select id="week-select" disabled><option>Loading…</option></select>
+    </div>
+  </header>
+
+  <div id="status-banner-wrap"></div>
+
+  <nav class="top-nav">
+    <button class="tab-btn active" data-tab="combined">Combined</button>
+    <button class="tab-btn" data-tab="google">Google Ads</button>
+    <button class="tab-btn" data-tab="linkedin">LinkedIn Ads</button>
+    <button class="tab-btn" data-tab="chatgpt">ChatGPT Ads</button>
+    <button class="tab-btn" data-tab="trends">Trends</button>
+  </nav>
+
+  <div id="tab-combined" class="top-section active">
+    <nav class="sub-nav">
+      <a href="#exec-summary">Executive Summary</a>
+      <a href="#combined-kpis">Combined KPIs</a>
+      <a href="#combined-mix">Spend by Channel</a>
+      <a href="#google-totals">Google Ads Totals</a>
+      <a href="#linkedin-totals">LinkedIn Ads Totals</a>
+      <a href="#chatgpt-totals">ChatGPT Ads Totals</a>
+    </nav>
+
+    <section id="exec-summary" class="topic">
+      <h2 class="exec-summary-title">Executive Summary</h2>
+      <div class="exec-summary-box" id="exec-summary-box"><span class="skeleton-text">Loading executive summary…</span></div>
+    </section>
+
+    <section id="combined-kpis" class="topic">
+      <h3>Combined KPIs</h3>
+      <div id="combined-kpis-note"></div>
+      <div class="kpi-grid" id="combined-kpis-grid"></div>
+    </section>
+
+    <section id="combined-mix" class="topic">
+      <h3>Spend by Channel</h3>
+      <div id="mix-wrap"></div>
+    </section>
+
+    <section id="google-totals" class="topic">
+      <h3>Google Ads Totals</h3>
+      <div id="google-totals-note"></div>
+      <div class="kpi-grid" id="google-totals-grid"></div>
+    </section>
+
+    <section id="linkedin-totals" class="topic">
+      <h3>LinkedIn Ads Totals</h3>
+      <div class="kpi-grid" id="linkedin-totals-grid"></div>
+    </section>
+
+    <section id="chatgpt-totals" class="topic">
+      <h3>ChatGPT Ads Totals</h3>
+      <div id="chatgpt-totals-note"></div>
+      <div class="kpi-grid" id="chatgpt-totals-grid"></div>
+    </section>
+  </div>
+
+  <div id="tab-google" class="top-section">
+    <nav class="sub-nav">
+      <a href="#ga-campaign">Campaign</a>
+      <a href="#ga-adgroup">Ad Group</a>
+      <a href="#ga-keyword">Keyword</a>
+      <a href="#ga-location">Location</a>
+      <a href="#ga-searchterm">Search Term</a>
+    </nav>
+
+    <section id="ga-campaign" class="topic">
+      <h3>Campaign Performance</h3>
+      <div id="ga-campaign-note"></div>
+      <div class="table-scroll">
+      <table>
+        <thead><tr><th>Campaign Name</th><th>Status</th><th>Channel Type</th><th class="num">Spend</th>
+          <th class="num">Impressions</th><th class="num">Clicks</th><th class="num">CTR</th><th class="num">CPC</th>
+          <th class="num">Conversions</th><th class="num">Cost / Conv.</th><th class="num">WoW Spend</th></tr></thead>
+        <tbody id="ga-campaign-tbody"></tbody>
+      </table>
+      </div>
+    </section>
+
+    <section id="ga-adgroup" class="topic">
+      <h3>Ad Group Performance</h3>
+      <div class="table-scroll">
+      <table>
+        <thead><tr><th>Campaign Name</th><th>Ad Group Name</th><th>Status</th><th class="num">Spend</th>
+          <th class="num">Impressions</th><th class="num">Clicks</th><th class="num">CTR</th><th class="num">CPC</th>
+          <th class="num">Conversions</th><th class="num">Cost / Conv.</th></tr></thead>
+        <tbody id="ga-adgroup-tbody"></tbody>
+      </table>
+      </div>
+    </section>
+
+    <section id="ga-keyword" class="topic">
+      <h3>Keyword Performance</h3>
+      <div class="table-scroll">
+      <table>
+        <thead><tr><th>Campaign Name</th><th>Ad Group Name</th><th>Keyword</th><th>Match Type</th>
+          <th class="num">Spend</th><th class="num">Impressions</th><th class="num">Clicks</th>
+          <th class="num">CTR</th><th class="num">CPC</th><th class="num">Conversions</th></tr></thead>
+        <tbody id="ga-keyword-tbody"></tbody>
+      </table>
+      </div>
+    </section>
+
+    <section id="ga-location" class="topic">
+      <h3>Location Performance</h3>
+      <div class="table-scroll">
+      <table>
+        <thead><tr><th>Campaign Name</th><th>Country</th><th>Location Type</th><th class="num">Spend</th>
+          <th class="num">Impressions</th><th class="num">Clicks</th><th class="num">CTR</th>
+          <th class="num">Conversions</th></tr></thead>
+        <tbody id="ga-geo-tbody"></tbody>
+      </table>
+      </div>
+    </section>
+
+    <section id="ga-searchterm" class="topic">
+      <h3>Search Term Performance</h3>
+      <div id="ga-searchterm-note"></div>
+      <div class="table-scroll">
+      <table>
+        <thead><tr><th>Campaign Name</th><th>Ad Group Name</th><th>Search Term</th><th>Status</th>
+          <th class="num">Spend</th><th class="num">Impressions</th><th class="num">Clicks</th>
+          <th class="num">CTR</th><th class="num">Conversions</th></tr></thead>
+        <tbody id="ga-searchterm-tbody"></tbody>
+      </table>
+      </div>
+    </section>
+  </div>
+
+  <div id="tab-linkedin" class="top-section">
+    <nav class="sub-nav">
+      <a href="#li-campaign">Campaign</a>
+      <a href="#li-adset">Ad Set</a>
+      <a href="#li-creative">Creative Performance</a>
+      <span id="li-demo-nav-extra"></span>
+    </nav>
+
+    <section id="li-campaign" class="topic">
+      <h3>Campaign Performance (roll-up)</h3>
+      <div class="table-scroll">
+      <table>
+        <thead><tr><th>Campaign Name</th><th class="num">Spend</th><th class="num">Impressions</th>
+          <th class="num">Clicks</th><th class="num">CTR</th><th class="num">CPM</th><th class="num">CPC</th>
+          <th class="num">Engagements</th><th class="num">Engagement Rate</th><th class="num">WoW Spend</th></tr></thead>
+        <tbody id="li-campaign-tbody"></tbody>
+      </table>
+      </div>
+    </section>
+
+    <section id="li-adset" class="topic">
+      <h3>Ad Set Performance</h3>
+      <div class="table-scroll">
+      <table>
+        <thead><tr><th>Campaign Name</th><th>Ad Set Name</th><th class="num">Spend</th><th class="num">Impressions</th>
+          <th class="num">Clicks</th><th class="num">CTR</th><th class="num">CPM</th><th class="num">CPC</th>
+          <th class="num">Engagements</th><th class="num">Engagement Rate</th><th class="num">WoW Spend</th></tr></thead>
+        <tbody id="li-adset-tbody"></tbody>
+      </table>
+      </div>
+    </section>
+
+    <section id="li-creative" class="topic">
+      <h3>Creative Performance (ad-level)</h3>
+      <div id="li-creative-note"></div>
+      <div class="table-scroll">
+      <table>
+        <thead><tr><th>Ad Name</th><th>Ad Set Name</th><th>Headline</th><th class="num">Spend</th>
+          <th class="num">Impressions</th><th class="num">Clicks</th><th class="num">CTR</th>
+          <th class="num">Engagements</th><th class="num">WoW Spend</th></tr></thead>
+        <tbody id="li-creative-tbody"></tbody>
+      </table>
+      </div>
+    </section>
+
+    <div id="li-demographics-container"></div>
+  </div>
+  <div id="tab-chatgpt" class="top-section">
+    <nav class="sub-nav">
+      <a href="#cg-totals">Totals</a>
+      <a href="#cg-adgroup">Ad Group</a>
+      <a href="#cg-ad">Ad Performance</a>
+    </nav>
+    <p class="asof" id="cg-asof"></p>
+
+    <section id="cg-totals" class="topic">
+      <h3>ChatGPT Ads Totals</h3>
+      <div id="cg-note"></div>
+      <div class="kpi-grid" id="cg-totals-grid"></div>
+    </section>
+
+    <section id="cg-adgroup" class="topic">
+      <h3>Ad Group Performance</h3>
+      <div class="table-scroll">
+      <table>
+        <thead><tr><th>Campaign Name</th><th>Ad Group Name</th><th>Status</th><th>Billing Event</th><th class="num">Max Bid</th>
+          <th class="num">Spend</th><th class="num">Impressions</th><th class="num">Clicks</th><th class="num">CTR</th>
+          <th class="num">CPC</th><th class="num">CPM</th><th class="num">Conversions</th><th class="num">WoW Spend</th></tr></thead>
+        <tbody id="cg-adgroup-tbody"></tbody>
+      </table>
+      </div>
+    </section>
+
+    <section id="cg-ad" class="topic">
+      <h3>Ad Performance (creative-level)</h3>
+      <div id="cg-ad-note"></div>
+      <div class="table-scroll">
+      <table>
+        <thead><tr><th>Ad Name</th><th>Ad Group Name</th><th>Status</th><th>Review</th><th>Headline</th><th>Ad Copy</th>
+          <th class="num">Spend</th><th class="num">Impressions</th><th class="num">Clicks</th><th class="num">CTR</th>
+          <th class="num">CPC</th><th class="num">CPM</th><th class="num">Conversions</th><th class="num">WoW Spend</th></tr></thead>
+        <tbody id="cg-ad-tbody"></tbody>
+      </table>
+      </div>
+    </section>
+  </div>
+  <div id="tab-trends" class="top-section">
+    <p class="note">Weekly totals for Aug 26 – Oct 13, 2026. ChatGPT Ads tracking starts with the week of Oct 7; earlier weeks are not backfilled, so total spend and its week-over-week change include a new channel from that week on. Week of Aug 26 uses LinkedIn's own comparison figures from the following week's export, because the stored Aug 26 snapshot under-reports LinkedIn spend (values of $1,000 or more were dropped). Week-over-week changes use true week totals.</p>
+    <div id="trends-wow" class="kpi-grid"></div>
+    <div id="trends-charts" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(380px,100%),1fr));gap:16px;margin-top:16px"></div>
+    <section class="topic"><h3>Weekly totals</h3><div class="table-scroll"><table><thead><tr><th>Week</th><th class="num">Total spend</th><th class="num">LinkedIn spend</th><th class="num">Google Ads spend</th><th class="num">ChatGPT Ads spend</th><th class="num">Impressions</th><th class="num">Clicks</th><th class="num">CTR</th><th class="num">Conversions</th><th class="num">WoW spend</th></tr></thead><tbody id="trends-tbody"></tbody></table></div></section>
+  </div>
+</div>
+<script>
+(function () {
+  'use strict';
+
+  var HISTORY_FOLDER_ID = '115AKkNbkEc1OjrrAcdA8hpYZbRq2x7N9';
+  var DASHBOARD_SPECS_FOLDER_ID = '17YUKKHX6Zs9R2ImV8t8oES2YpxenjIKG';
+  var SERVER = 'Google Drive';
+  var SEARCH_TERM_TOP_N = 50;
+  var MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+  var mcp = null;
+  var gaHistoryCache = null; // array once fetched, cached for the session
+  var haveRenderedOnce = false;
+
+  // ---------------- formatting helpers (mirror generate_dashboard.py) ----------------
+
+  function esc(s) {
+    if (s === null || s === undefined) return '';
+    return String(s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+  function fmtMoney(v) {
+    return (v === null || v === undefined) ? '—' : '$' + Number(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+  function fmtInt(v) {
+    return (v === null || v === undefined) ? '—' : Math.round(Number(v)).toLocaleString('en-US');
+  }
+  function fmtPct(v, decimals) {
+    if (v === null || v === undefined) return '—';
+    decimals = (decimals === undefined) ? 2 : decimals;
+    return Number(v).toLocaleString('en-US', { minimumFractionDigits: decimals, maximumFractionDigits: decimals }) + '%';
+  }
+  function safeDiv(a, b) { return b ? (a / b) : null; }
+  function wowCalc(now, prior) {
+    if (prior === null || prior === undefined || !prior) return null;
+    return (now - prior) / prior * 100;
+  }
+  function wowBadge(pct) {
+    if (pct === null || pct === undefined) return '<span class="wow wow-na">—</span>';
+    var cls = pct > 0 ? 'wow-up' : (pct < 0 ? 'wow-down' : 'wow-flat');
+    var arrow = pct > 0 ? '▲' : (pct < 0 ? '▼' : '▪');
+    return '<span class="wow ' + cls + '">' + arrow + ' ' + fmtPct(Math.abs(pct), 1) + '</span>';
+  }
+  function weekLabel(startStr, endStr) {
+    var s = startStr.split('-').map(Number), e = endStr.split('-').map(Number);
+    var sm = s[1], sd = s[2], em = e[1], ed = e[2], ey = e[0];
+    if (sm === em) return MONTHS[sm - 1] + ' ' + sd + ' – ' + ed + ', ' + ey;
+    return MONTHS[sm - 1] + ' ' + sd + ' – ' + MONTHS[em - 1] + ' ' + ed + ', ' + ey;
+  }
+  function fmtLastUpdated(iso) {
+    var d = new Date(iso);
+    if (isNaN(d.getTime())) return esc(iso);
+    var h = d.getUTCHours();
+    var ampm = h >= 12 ? 'PM' : 'AM';
+    var h12 = h % 12; if (h12 === 0) h12 = 12;
+    var mins = String(d.getUTCMinutes()).padStart(2, '0');
+    return 'Last updated: ' + MONTHS[d.getUTCMonth()] + ' ' + d.getUTCDate() + ', ' + d.getUTCFullYear() + ', ' + h12 + ':' + mins + ' ' + ampm + ' UTC';
+  }
+  function fmtDay(str) {
+    var p = String(str).split('-').map(Number);
+    return MONTHS[p[1] - 1] + ' ' + p[2] + ', ' + p[0];
+  }
+  function kpiCard(label, value, wowPct, sub) {
+    var subHtml = sub ? '<div class="kpi-sub">' + esc(sub) + '</div>' : '';
+    return '<div class="kpi-card"><div class="kpi-label">' + esc(label) + '</div>' +
+      '<div class="kpi-value">' + value + '</div>' +
+      '<div class="kpi-wow">' + wowBadge(wowPct) + '</div>' + subHtml + '</div>';
+  }
+  function sumField(rows, field) {
+    var t = 0;
+    for (var i = 0; i < rows.length; i++) { t += (rows[i][field] || 0); }
+    return t;
+  }
+  function sortDesc(rows, field) {
+    return rows.slice().sort(function (a, b) { return (b[field] || 0) - (a[field] || 0); });
+  }
+  function statusClass(status) {
+    return 'status status-' + esc(String(status || '').toLowerCase());
+  }
+  function findWarning(warnings, prefix) {
+    if (!warnings) return null;
+    for (var i = 0; i < warnings.length; i++) {
+      if (warnings[i].indexOf(prefix) === 0) return warnings[i];
+    }
+    return null;
+  }
+
+  // ---------------- status banner ----------------
+
+  function showBanner(kind, message) {
+    var wrap = document.getElementById('status-banner-wrap');
+    wrap.innerHTML = '<div class="status-banner ' + esc(kind) + '">' + esc(message) + '</div>';
+  }
+  function clearBanner() {
+    document.getElementById('status-banner-wrap').innerHTML = '';
+  }
+
+  // ---------------- sortable tables (mirrors generate_dashboard.py's client script) ----------------
+
+  function parseCellValue(cell) {
+    var text = cell.textContent.trim();
+    if (text === '' || text === '—') return null;
+    var isNegative = text.indexOf('▼') !== -1;
+    var cleaned = text.replace(/[▲▼▪$,%]/g, '').trim();
+    if (cleaned !== '' && /^-?[0-9.]+$/.test(cleaned)) {
+      var num = parseFloat(cleaned);
+      return isNegative ? -Math.abs(num) : num;
+    }
+    return text.toLowerCase();
+  }
+  function compareRows(a, b, colIndex, dir) {
+    var va = parseCellValue(a.children[colIndex]);
+    var vb = parseCellValue(b.children[colIndex]);
+    if (va === null && vb === null) return 0;
+    if (va === null) return 1;
+    if (vb === null) return -1;
+    var cmp = (typeof va === 'number' && typeof vb === 'number') ? va - vb : String(va).localeCompare(String(vb));
+    return dir === 'asc' ? cmp : -cmp;
+  }
+  function initSortableTables() {
+    document.querySelectorAll('table').forEach(function (table) {
+      var thead = table.querySelector('thead');
+      var tbody = table.querySelector('tbody');
+      if (!thead || !tbody) return;
+      var ths = Array.prototype.slice.call(thead.querySelectorAll('th'));
+      if (!ths.length) return;
+      var headerTexts = ths.map(function (th) { return th.textContent.trim(); });
+      var originalRows = Array.prototype.slice.call(tbody.querySelectorAll('tr'));
+      var state = { col: -1, dir: 'none' };
+
+      function applySort(colIndex, dir) {
+        if (dir === 'none') {
+          originalRows.forEach(function (r) { tbody.appendChild(r); });
+          return;
+        }
+        var rows = Array.prototype.slice.call(tbody.querySelectorAll('tr'));
+        rows.sort(function (a, b) { return compareRows(a, b, colIndex, dir); });
+        rows.forEach(function (r) { tbody.appendChild(r); });
+      }
+      function updateIndicators() {
+        ths.forEach(function (th, idx) {
+          var ind = th.querySelector('.sort-indicator');
+          if (!ind) return;
+          ind.textContent = (state.col === idx && state.dir !== 'none') ? (state.dir === 'asc' ? '▲' : '▼') : '';
+        });
+      }
+      ths.forEach(function (th, idx) {
+        if (!th.querySelector('.sort-indicator')) {
+          th.classList.add('sortable-th');
+          var indicator = document.createElement('span');
+          indicator.className = 'sort-indicator';
+          th.appendChild(indicator);
+        }
+      });
+      // re-bind fresh listeners each call (tbody rows are new elements after each render)
+      ths.forEach(function (th, idx) {
+        var clone = th.cloneNode(true);
+        th.parentNode.replaceChild(clone, th);
+      });
+      var thsFresh = Array.prototype.slice.call(thead.querySelectorAll('th'));
+      thsFresh.forEach(function (th, idx) {
+        th.addEventListener('click', function () {
+          if (state.col !== idx) { state = { col: idx, dir: 'asc' }; }
+          else if (state.dir === 'asc') { state = { col: idx, dir: 'desc' }; }
+          else if (state.dir === 'desc') { state = { col: -1, dir: 'none' }; }
+          else { state = { col: idx, dir: 'asc' }; }
+          applySort(idx, state.dir);
+          updateIndicatorsFresh();
+        });
+      });
+      function updateIndicatorsFresh() {
+        thsFresh.forEach(function (th, idx) {
+          var ind = th.querySelector('.sort-indicator');
+          if (!ind) return;
+          ind.textContent = (state.col === idx && state.dir !== 'none') ? (state.dir === 'asc' ? '▲' : '▼') : '';
+        });
+      }
+      var defaultCol = headerTexts.indexOf('Impressions');
+      if (defaultCol >= 0) {
+        state = { col: defaultCol, dir: 'desc' };
+        applySort(defaultCol, 'desc');
+        updateIndicatorsFresh();
+      }
+    });
+  }
+
+  // ---------------- tab switching (static, bound once) ----------------
+
+  document.querySelectorAll('.tab-btn').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      document.querySelectorAll('.tab-btn').forEach(function (b) { b.classList.remove('active'); });
+      document.querySelectorAll('.top-section').forEach(function (s) { s.classList.remove('active'); });
+      btn.classList.add('active');
+      document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+    });
+  });
+
+  // ---------------- rendering (mirrors generate_dashboard.py's main()) ----------------
+
+  function renderWeek(unified, gaHistory, snapshotModifiedIso) {
+    var meta = unified.meta;
+    var records = unified.records;
+    var weekStart = meta.week_start, weekEnd = meta.week_end;
+
+    document.getElementById('week-range').textContent = weekLabel(weekStart, weekEnd);
+    document.getElementById('last-updated').textContent = (snapshotModifiedIso ? fmtLastUpdated(snapshotModifiedIso) + ' · ' : '') + 'Data through ' + fmtDay(weekEnd);
+
+    var ga = records.filter(function (r) { return r.table_type === 'google_ads_campaign'; });
+    var gaAdgroup = records.filter(function (r) { return r.table_type === 'google_ads_adgroup'; });
+    var gaKeyword = records.filter(function (r) { return r.table_type === 'google_ads_keyword'; });
+    var gaGeo = records.filter(function (r) { return r.table_type === 'google_ads_geo'; });
+    var gaSearchterm = records.filter(function (r) { return r.table_type === 'google_ads_searchterm'; });
+    var liCamp = records.filter(function (r) { return r.table_type === 'linkedin_campaign'; });
+    var liCreative = records.filter(function (r) { return r.table_type === 'linkedin_creative'; });
+    var liDemo = records.filter(function (r) { return r.table_type === 'linkedin_demographic'; });
+
+    // ---- Google Ads totals (current + prior, from gaHistory) ----
+    var gaNow = {
+      spend: sumField(ga, 'spend'), impressions: sumField(ga, 'impressions'),
+      clicks: sumField(ga, 'clicks'), conversions: sumField(ga, 'conversions'),
+      conversion_value: sumField(ga, 'conversion_value')
+    };
+    var priorWeeksSet = {};
+    gaHistory.forEach(function (e) { if (e.week_start < weekStart) priorWeeksSet[e.week_start] = true; });
+    var priorWeeks = Object.keys(priorWeeksSet).sort();
+    var priorWeek = priorWeeks.length ? priorWeeks[priorWeeks.length - 1] : null;
+    var gaPrior = null;
+    if (priorWeek) {
+      var priorEntries = gaHistory.filter(function (e) { return e.week_start === priorWeek; });
+      gaPrior = {
+        spend: sumField(priorEntries, 'spend'), impressions: sumField(priorEntries, 'impressions'),
+        clicks: sumField(priorEntries, 'clicks'), conversions: sumField(priorEntries, 'conversions')
+      };
+    }
+    var gaCtr = safeDiv(gaNow.clicks, gaNow.impressions);
+    var gaCtrPct = gaCtr !== null ? gaCtr * 100 : null;
+    var gaCpc = safeDiv(gaNow.spend, gaNow.clicks);
+    var gaCostPerConv = safeDiv(gaNow.spend, gaNow.conversions);
+    var gaPriorCtr = null, gaPriorCpc = null, gaPriorCostPerConv = null;
+    if (gaPrior) {
+      gaPriorCtr = safeDiv(gaPrior.clicks, gaPrior.impressions);
+      gaPriorCpc = safeDiv(gaPrior.spend, gaPrior.clicks);
+      gaPriorCostPerConv = safeDiv(gaPrior.spend, gaPrior.conversions);
+    }
+    var gaWow = {
+      spend: gaPrior ? wowCalc(gaNow.spend, gaPrior.spend) : null,
+      impressions: gaPrior ? wowCalc(gaNow.impressions, gaPrior.impressions) : null,
+      clicks: gaPrior ? wowCalc(gaNow.clicks, gaPrior.clicks) : null,
+      conversions: gaPrior ? wowCalc(gaNow.conversions, gaPrior.conversions) : null,
+      ctr: (gaPrior && gaPriorCtr) ? wowCalc(gaCtr, gaPriorCtr) : null,
+      cpc: (gaPrior && gaPriorCpc) ? wowCalc(gaCpc, gaPriorCpc) : null,
+      cost_per_conv: (gaPrior && gaPriorCostPerConv) ? wowCalc(gaCostPerConv, gaPriorCostPerConv) : null
+    };
+
+    // ---- LinkedIn totals (current + prior, from Compare-range columns already in the records) ----
+    var liNow = {
+      spend: sumField(liCamp, 'spend'), impressions: sumField(liCamp, 'impressions'),
+      clicks: sumField(liCamp, 'clicks'), conversions: sumField(liCamp, 'conversions'),
+      conversion_value: sumField(liCamp, 'conversion_value'), engagement_total: sumField(liCamp, 'engagement_total')
+    };
+    var liPrior = {
+      spend: sumField(liCamp, 'spend_prior_period'), impressions: sumField(liCamp, 'impressions_prior_period'),
+      clicks: sumField(liCamp, 'clicks_prior_period'), conversions: sumField(liCamp, 'conversions_prior_period'),
+      engagement_total: sumField(liCamp, 'engagement_total_prior_period')
+    };
+    var liCtr = safeDiv(liNow.clicks, liNow.impressions);
+    var liCtrPct = liCtr !== null ? liCtr * 100 : null;
+    var liCpc = safeDiv(liNow.spend, liNow.clicks);
+    var liCostPerConv = safeDiv(liNow.spend, liNow.conversions);
+    var liCostPerEngagement = safeDiv(liNow.spend, liNow.engagement_total);
+    var liPriorCtr = safeDiv(liPrior.clicks, liPrior.impressions);
+    var liPriorCpc = safeDiv(liPrior.spend, liPrior.clicks);
+    var liPriorCostPerConv = safeDiv(liPrior.spend, liPrior.conversions);
+    var liPriorCostPerEngagement = safeDiv(liPrior.spend, liPrior.engagement_total);
+    var liWow = {
+      spend: wowCalc(liNow.spend, liPrior.spend),
+      impressions: wowCalc(liNow.impressions, liPrior.impressions),
+      clicks: wowCalc(liNow.clicks, liPrior.clicks),
+      conversions: wowCalc(liNow.conversions, liPrior.conversions),
+      engagement_total: wowCalc(liNow.engagement_total, liPrior.engagement_total),
+      ctr: liPriorCtr ? wowCalc(liCtr, liPriorCtr) : null,
+      cpc: liPriorCpc ? wowCalc(liCpc, liPriorCpc) : null,
+      cost_per_conv: liPriorCostPerConv ? wowCalc(liCostPerConv, liPriorCostPerConv) : null,
+      cost_per_engagement: liPriorCostPerEngagement ? wowCalc(liCostPerEngagement, liPriorCostPerEngagement) : null
+    };
+
+    // ---- ChatGPT Ads totals (prior period only when the records carry *_prior_period values) ----
+    var cgAds = records.filter(function (r) { return r.table_type === 'chatgpt_ad'; });
+    var cgGroups = records.filter(function (r) { return r.table_type === 'chatgpt_adgroup'; });
+    var haveCg = cgAds.length > 0 || cgGroups.length > 0;
+    var cgBase = cgAds.length ? cgAds : cgGroups;
+    var cgNow = {
+      spend: sumField(cgBase, 'spend'), impressions: sumField(cgBase, 'impressions'),
+      clicks: sumField(cgBase, 'clicks'), conversions: sumField(cgBase, 'conversions')
+    };
+    var cgPriorAvail = cgBase.some(function (r) { return r.spend_prior_period !== null && r.spend_prior_period !== undefined; });
+    var cgPrior = cgPriorAvail ? {
+      spend: sumField(cgBase, 'spend_prior_period'), impressions: sumField(cgBase, 'impressions_prior_period'),
+      clicks: sumField(cgBase, 'clicks_prior_period'), conversions: sumField(cgBase, 'conversions_prior_period')
+    } : null;
+    var cgCtr = safeDiv(cgNow.clicks, cgNow.impressions);
+    var cgCtrPct = cgCtr !== null ? cgCtr * 100 : null;
+    var cgCpc = safeDiv(cgNow.spend, cgNow.clicks);
+    var cgCpm = cgNow.impressions ? safeDiv(cgNow.spend, cgNow.impressions / 1000) : null;
+    var cgCostPerConv = safeDiv(cgNow.spend, cgNow.conversions);
+    var cgPriorCtr = cgPrior ? safeDiv(cgPrior.clicks, cgPrior.impressions) : null;
+    var cgPriorCpc = cgPrior ? safeDiv(cgPrior.spend, cgPrior.clicks) : null;
+    var cgPriorCpm = (cgPrior && cgPrior.impressions) ? safeDiv(cgPrior.spend, cgPrior.impressions / 1000) : null;
+    var cgPriorCostPerConv = cgPrior ? safeDiv(cgPrior.spend, cgPrior.conversions) : null;
+    var cgWow = {
+      spend: cgPrior ? wowCalc(cgNow.spend, cgPrior.spend) : null,
+      impressions: cgPrior ? wowCalc(cgNow.impressions, cgPrior.impressions) : null,
+      clicks: cgPrior ? wowCalc(cgNow.clicks, cgPrior.clicks) : null,
+      conversions: cgPrior ? wowCalc(cgNow.conversions, cgPrior.conversions) : null,
+      ctr: cgPriorCtr ? wowCalc(cgCtr, cgPriorCtr) : null,
+      cpc: cgPriorCpc ? wowCalc(cgCpc, cgPriorCpc) : null,
+      cpm: cgPriorCpm ? wowCalc(cgCpm, cgPriorCpm) : null,
+      cost_per_conv: cgPriorCostPerConv ? wowCalc(cgCostPerConv, cgPriorCostPerConv) : null
+    };
+
+    // ---- Combined (blend absolute totals, then recompute ratios) ----
+    var combSpend = gaNow.spend + liNow.spend + cgNow.spend;
+    var combImpr = gaNow.impressions + liNow.impressions + cgNow.impressions;
+    var combClicks = gaNow.clicks + liNow.clicks + cgNow.clicks;
+    var combConv = gaNow.conversions + liNow.conversions + cgNow.conversions;
+    var combCtr = safeDiv(combClicks, combImpr);
+    var combCtrPct = combCtr !== null ? combCtr * 100 : null;
+    var combCpc = safeDiv(combSpend, combClicks);
+    // ChatGPT spend only counts toward Cost / Conversion once ChatGPT reports conversions.
+    var combConvSpend = gaNow.spend + liNow.spend + (cgNow.conversions > 0 ? cgNow.spend : 0);
+    var combCostPerConv = safeDiv(combConvSpend, combConv);
+    var combEngagements = liNow.engagement_total;
+    var combCostPerEngagement = liCostPerEngagement;
+
+    // Week-over-week is like-for-like: ChatGPT joins the comparison only when it has a prior period.
+    var haveBothPriors = gaPrior !== null;
+    var cmpCg = cgPriorAvail;
+    var cmpNow = {
+      spend: gaNow.spend + liNow.spend + (cmpCg ? cgNow.spend : 0),
+      impressions: gaNow.impressions + liNow.impressions + (cmpCg ? cgNow.impressions : 0),
+      clicks: gaNow.clicks + liNow.clicks + (cmpCg ? cgNow.clicks : 0),
+      conversions: gaNow.conversions + liNow.conversions + (cmpCg ? cgNow.conversions : 0)
+    };
+    var cmpCtr = safeDiv(cmpNow.clicks, cmpNow.impressions);
+    var cmpCpc = safeDiv(cmpNow.spend, cmpNow.clicks);
+    var cmpCostPerConv = safeDiv(cmpNow.spend, cmpNow.conversions);
+    var combPriorSpend = null, combPriorImpr = null, combPriorClicks = null, combPriorConv = null;
+    if (haveBothPriors) {
+      combPriorSpend = gaPrior.spend + liPrior.spend + (cmpCg ? cgPrior.spend : 0);
+      combPriorImpr = gaPrior.impressions + liPrior.impressions + (cmpCg ? cgPrior.impressions : 0);
+      combPriorClicks = gaPrior.clicks + liPrior.clicks + (cmpCg ? cgPrior.clicks : 0);
+      combPriorConv = gaPrior.conversions + liPrior.conversions + (cmpCg ? cgPrior.conversions : 0);
+    }
+    var combWowSpend = haveBothPriors ? wowCalc(cmpNow.spend, combPriorSpend) : null;
+    var combWowImpr = haveBothPriors ? wowCalc(cmpNow.impressions, combPriorImpr) : null;
+    var combWowClicks = haveBothPriors ? wowCalc(cmpNow.clicks, combPriorClicks) : null;
+    var combWowConv = haveBothPriors ? wowCalc(cmpNow.conversions, combPriorConv) : null;
+    var combPriorCtr = haveBothPriors ? safeDiv(combPriorClicks, combPriorImpr) : null;
+    var combPriorCpc = haveBothPriors ? safeDiv(combPriorSpend, combPriorClicks) : null;
+    var combPriorCostPerConv = haveBothPriors ? safeDiv(combPriorSpend, combPriorConv) : null;
+    var combWowCtr = combPriorCtr ? wowCalc(cmpCtr, combPriorCtr) : null;
+    var combWowCpc = combPriorCpc ? wowCalc(cmpCpc, combPriorCpc) : null;
+    var combWowCostPerConv = combPriorCostPerConv ? wowCalc(cmpCostPerConv, combPriorCostPerConv) : null;
+    var combWowEngagement = liWow.engagement_total;
+    var combWowCostPerEngagement = liWow.cost_per_engagement;
+
+    // ================= Executive Summary =================
+    var wowClause = '';
+    if (haveBothPriors && combWowSpend !== null) {
+      var direction = combWowSpend > 0 ? 'up' : (combWowSpend < 0 ? 'down' : 'flat');
+      wowClause = ' That’s ' + direction + ' ' + fmtPct(Math.abs(combWowSpend), 1) + ' week-over-week on spend' + ((haveCg && !cmpCg) ? ' (Google Ads and LinkedIn Ads only; ChatGPT Ads has no prior week yet)' : '') + '.';
+    }
+    var firstRunClause = !priorWeek
+      ? ' Google Ads week-over-week comparisons aren’t available yet — this is the first tracked week for that history file.'
+      : '';
+    var cgClause = haveCg
+      ? (' ChatGPT Ads delivered ' + fmtInt(cgNow.impressions) + ' impressions and ' + fmtInt(cgNow.clicks) + ' clicks (' +
+         fmtPct(cgCtrPct) + ' CTR) at ' + fmtMoney(cgCpc) + ' CPC' +
+         (cgNow.conversions > 0 ? ', with ' + fmtInt(cgNow.conversions) + ' conversions.'
+           : ', with no conversions reported, so Cost / Conversion excludes ChatGPT spend.'))
+      : '';
+    var execSummary =
+      'This week (' + esc(weekLabel(weekStart, weekEnd)) + '), combined marketing spend was ' +
+      fmtMoney(combSpend) + ' across Google Ads (' + fmtMoney(gaNow.spend) + ')' + (haveCg ? ', ' : ' and ') +
+      'LinkedIn Ads (' + fmtMoney(liNow.spend) + ')' + (haveCg ? ' and ChatGPT Ads (' + fmtMoney(cgNow.spend) + ')' : '') + '.' + wowClause + ' ' +
+      'Combined activity drove ' + fmtInt(combImpr) + ' impressions and ' + fmtInt(combClicks) + ' clicks ' +
+      '(' + fmtPct(combCtrPct) + ' CTR) at ' + fmtMoney(combCpc) + ' average CPC, producing ' +
+      fmtInt(combConv) + ' conversions at ' + fmtMoney(combCostPerConv) + ' cost per conversion. ' +
+      'LinkedIn also generated ' + fmtInt(combEngagements) + ' engagements at ' +
+      fmtMoney(combCostPerEngagement) + ' cost per engagement' +
+      (liWow.engagement_total !== null ? (' (' + wowBadge(combWowEngagement) + ' WoW).') : '.') +
+      cgClause +
+      firstRunClause;
+    document.getElementById('exec-summary-box').innerHTML = execSummary;
+
+    document.getElementById('combined-kpis-grid').innerHTML = [
+      kpiCard('Spend', fmtMoney(combSpend), combWowSpend),
+      kpiCard('Impressions', fmtInt(combImpr), combWowImpr),
+      kpiCard('Clicks', fmtInt(combClicks), combWowClicks),
+      kpiCard('CTR', fmtPct(combCtrPct), combWowCtr),
+      kpiCard('CPC', fmtMoney(combCpc), combWowCpc),
+      kpiCard('Conversions', fmtInt(combConv), combWowConv),
+      kpiCard('Cost / Conversion', fmtMoney(combCostPerConv), combWowCostPerConv, (haveCg && !cgNow.conversions) ? 'Excludes ChatGPT spend' : undefined),
+      kpiCard('Engagements', fmtInt(combEngagements), combWowEngagement, 'LinkedIn only'),
+      kpiCard('Cost / Engagement', fmtMoney(combCostPerEngagement), combWowCostPerEngagement, 'LinkedIn only')
+    ].join('');
+
+    var combNote = '';
+    if (haveCg && !cmpCg) {
+      combNote = 'Week-over-week badges compare Google Ads and LinkedIn Ads only. ChatGPT Ads has no prior week yet (first tracked week), so it is counted in the totals but not in the comparison.';
+    }
+    document.getElementById('combined-kpis-note').innerHTML = combNote ? '<p class="note">' + esc(combNote) + '</p>' : '';
+
+    var mixParts = [{ n: 'LinkedIn Ads', v: liNow.spend, c: '#2563eb' }, { n: 'Google Ads', v: gaNow.spend, c: '#f59e0b' }];
+    if (haveCg) mixParts.push({ n: 'ChatGPT Ads', v: cgNow.spend, c: '#0d9488' });
+    var mixTotal = combSpend;
+    document.getElementById('mix-wrap').innerHTML = mixTotal ?
+      '<div class="mix-bar" role="img" aria-label="Spend by channel">' + mixParts.map(function (p) {
+        return '<div class="mix-seg" style="flex:' + p.v + ' 1 0;background:' + p.c + '" title="' + esc(p.n + ': ' + fmtMoney(p.v) + ' (' + fmtPct(p.v / mixTotal * 100, 1) + ')') + '"></div>';
+      }).join('') + '</div><div class="mix-legend">' + mixParts.map(function (p) {
+        return '<div><span class="sw" style="background:' + p.c + '"></span>' + esc(p.n) + ' <span class="mix-val">' + fmtMoney(p.v) + ' · ' + fmtPct(p.v / mixTotal * 100, 1) + '</span></div>';
+      }).join('') + '</div>' : '<p class="note">No spend this week.</p>';
+
+    var gaFirstRunNote = !priorWeek
+      ? 'First run for this history file — no prior week to compare against, so WoW is blank for all Google Ads figures. This is expected, not a bug.'
+      : null;
+    document.getElementById('google-totals-note').innerHTML = gaFirstRunNote ? '<p class="note">' + esc(gaFirstRunNote) + '</p>' : '';
+    document.getElementById('google-totals-grid').innerHTML = [
+      kpiCard('Spend', fmtMoney(gaNow.spend), gaWow.spend),
+      kpiCard('Impressions', fmtInt(gaNow.impressions), gaWow.impressions),
+      kpiCard('Clicks', fmtInt(gaNow.clicks), gaWow.clicks),
+      kpiCard('CTR', fmtPct(gaCtrPct), gaWow.ctr),
+      kpiCard('CPC', fmtMoney(gaCpc), gaWow.cpc),
+      kpiCard('Conversions', fmtInt(gaNow.conversions), gaWow.conversions),
+      kpiCard('Cost / Conversion', fmtMoney(gaCostPerConv), gaWow.cost_per_conv)
+    ].join('');
+
+    document.getElementById('linkedin-totals-grid').innerHTML = [
+      kpiCard('Spend', fmtMoney(liNow.spend), liWow.spend),
+      kpiCard('Impressions', fmtInt(liNow.impressions), liWow.impressions),
+      kpiCard('Clicks', fmtInt(liNow.clicks), liWow.clicks),
+      kpiCard('CTR', fmtPct(liCtrPct), liWow.ctr),
+      kpiCard('CPC', fmtMoney(liCpc), liWow.cpc),
+      kpiCard('Conversions', fmtInt(liNow.conversions), liWow.conversions),
+      kpiCard('Cost / Conversion', fmtMoney(liCostPerConv), liWow.cost_per_conv),
+      kpiCard('Engagements', fmtInt(liNow.engagement_total), liWow.engagement_total),
+      kpiCard('Cost / Engagement', fmtMoney(liCostPerEngagement), liWow.cost_per_engagement)
+    ].join('');
+
+    // ================= GOOGLE ADS tables =================
+    document.getElementById('ga-campaign-note').innerHTML = gaFirstRunNote ? '<p class="note">' + esc(gaFirstRunNote) + '</p>' : '';
+    document.getElementById('ga-campaign-tbody').innerHTML = sortDesc(ga, 'spend').map(function (r) {
+      var cpc = safeDiv(r.spend, r.clicks);
+      var costPerConv = safeDiv(r.spend, r.conversions);
+      return '<tr><td>' + esc(r.campaign_name) + '</td>' +
+        '<td><span class="' + statusClass(r.campaign_status) + '">' + esc(r.campaign_status) + '</span></td>' +
+        '<td>' + esc(r.channel_type) + '</td>' +
+        '<td class="num">' + fmtMoney(r.spend) + '</td>' +
+        '<td class="num">' + fmtInt(r.impressions) + '</td>' +
+        '<td class="num">' + fmtInt(r.clicks) + '</td>' +
+        '<td class="num">' + fmtPct(r.ctr) + '</td>' +
+        '<td class="num">' + fmtMoney(cpc) + '</td>' +
+        '<td class="num">' + fmtInt(r.conversions) + '</td>' +
+        '<td class="num">' + fmtMoney(costPerConv) + '</td>' +
+        '<td class="num">' + wowBadge(r.wow_spend_change_pct) + '</td></tr>';
+    }).join('');
+
+    document.getElementById('ga-adgroup-tbody').innerHTML = sortDesc(gaAdgroup, 'spend').map(function (r) {
+      var costPerConv = safeDiv(r.spend, r.conversions);
+      return '<tr><td>' + esc(r.campaign_name) + '</td><td>' + esc(r.ad_group_name) + '</td>' +
+        '<td><span class="' + statusClass(r.ad_group_status) + '">' + esc(r.ad_group_status) + '</span></td>' +
+        '<td class="num">' + fmtMoney(r.spend) + '</td>' +
+        '<td class="num">' + fmtInt(r.impressions) + '</td>' +
+        '<td class="num">' + fmtInt(r.clicks) + '</td>' +
+        '<td class="num">' + fmtPct(r.ctr) + '</td>' +
+        '<td class="num">' + fmtMoney(r.cpc) + '</td>' +
+        '<td class="num">' + fmtInt(r.conversions) + '</td>' +
+        '<td class="num">' + fmtMoney(costPerConv) + '</td></tr>';
+    }).join('');
+
+    document.getElementById('ga-keyword-tbody').innerHTML = sortDesc(gaKeyword, 'spend').map(function (r) {
+      return '<tr><td>' + esc(r.campaign_name) + '</td><td>' + esc(r.ad_group_name) + '</td>' +
+        '<td>' + esc(r.keyword_text) + '</td><td>' + esc(r.match_type) + '</td>' +
+        '<td class="num">' + fmtMoney(r.spend) + '</td>' +
+        '<td class="num">' + fmtInt(r.impressions) + '</td>' +
+        '<td class="num">' + fmtInt(r.clicks) + '</td>' +
+        '<td class="num">' + fmtPct(r.ctr) + '</td>' +
+        '<td class="num">' + fmtMoney(r.cpc) + '</td>' +
+        '<td class="num">' + fmtInt(r.conversions) + '</td></tr>';
+    }).join('');
+
+    document.getElementById('ga-geo-tbody').innerHTML = sortDesc(gaGeo, 'spend').map(function (r) {
+      return '<tr><td>' + esc(r.campaign_name) + '</td><td>' + esc(r.country_name) + '</td>' +
+        '<td>' + esc(r.location_type) + '</td>' +
+        '<td class="num">' + fmtMoney(r.spend) + '</td>' +
+        '<td class="num">' + fmtInt(r.impressions) + '</td>' +
+        '<td class="num">' + fmtInt(r.clicks) + '</td>' +
+        '<td class="num">' + fmtPct(r.ctr) + '</td>' +
+        '<td class="num">' + fmtInt(r.conversions) + '</td></tr>';
+    }).join('');
+
+    var searchtermNote = findWarning(meta.warnings, 'Search Term Performance:') ||
+      ('Showing top ' + SEARCH_TERM_TOP_N + ' of ' + gaSearchterm.length + ' unique search terms by spend.');
+    document.getElementById('ga-searchterm-note').innerHTML = '<p class="note">' + esc(searchtermNote) + '</p>';
+    document.getElementById('ga-searchterm-tbody').innerHTML = sortDesc(gaSearchterm, 'spend').slice(0, SEARCH_TERM_TOP_N).map(function (r) {
+      return '<tr><td>' + esc(r.campaign_name) + '</td><td>' + esc(r.ad_group_name) + '</td>' +
+        '<td>' + esc(r.search_term) + '</td><td>' + esc(r.search_term_status) + '</td>' +
+        '<td class="num">' + fmtMoney(r.spend) + '</td>' +
+        '<td class="num">' + fmtInt(r.impressions) + '</td>' +
+        '<td class="num">' + fmtInt(r.clicks) + '</td>' +
+        '<td class="num">' + fmtPct(r.ctr) + '</td>' +
+        '<td class="num">' + fmtInt(r.conversions) + '</td></tr>';
+    }).join('');
+
+    // ================= LINKEDIN tables =================
+    var rollup = {};
+    liCamp.forEach(function (r) {
+      var key = r.campaign_id;
+      if (!rollup[key]) {
+        rollup[key] = {
+          campaign_name: r.campaign_name, spend: 0, impressions: 0, clicks: 0, engagement_total: 0,
+          spend_prior_period: 0, impressions_prior_period: 0, clicks_prior_period: 0, engagement_total_prior_period: 0,
+          has_spend_prior: false
+        };
+      }
+      var b = rollup[key];
+      b.spend += r.spend || 0;
+      b.impressions += r.impressions || 0;
+      b.clicks += r.clicks || 0;
+      b.engagement_total += r.engagement_total || 0;
+      if (r.spend_prior_period !== null && r.spend_prior_period !== undefined) {
+        b.spend_prior_period += r.spend_prior_period;
+        b.has_spend_prior = true;
+      }
+      b.impressions_prior_period += r.impressions_prior_period || 0;
+      b.clicks_prior_period += r.clicks_prior_period || 0;
+      b.engagement_total_prior_period += r.engagement_total_prior_period || 0;
+    });
+    var rollupRows = Object.keys(rollup).map(function (k) { return rollup[k]; }).sort(function (a, b) { return b.spend - a.spend; });
+    document.getElementById('li-campaign-tbody').innerHTML = rollupRows.map(function (b) {
+      var ctr = safeDiv(b.clicks, b.impressions);
+      var ctrPct = ctr !== null ? ctr * 100 : null;
+      var cpm = b.impressions ? safeDiv(b.spend, b.impressions / 1000) : null;
+      var cpc = safeDiv(b.spend, b.clicks);
+      var engagementRate = safeDiv(b.engagement_total, b.impressions);
+      var engagementRatePct = engagementRate !== null ? engagementRate * 100 : null;
+      var campaignWowSpend = (b.has_spend_prior && b.spend_prior_period) ? wowCalc(b.spend, b.spend_prior_period) : null;
+      return '<tr><td>' + esc(b.campaign_name) + '</td>' +
+        '<td class="num">' + fmtMoney(b.spend) + '</td>' +
+        '<td class="num">' + fmtInt(b.impressions) + '</td>' +
+        '<td class="num">' + fmtInt(b.clicks) + '</td>' +
+        '<td class="num">' + fmtPct(ctrPct) + '</td>' +
+        '<td class="num">' + fmtMoney(cpm) + '</td>' +
+        '<td class="num">' + fmtMoney(cpc) + '</td>' +
+        '<td class="num">' + fmtInt(b.engagement_total) + '</td>' +
+        '<td class="num">' + fmtPct(engagementRatePct) + '</td>' +
+        '<td class="num">' + wowBadge(campaignWowSpend) + '</td></tr>';
+    }).join('');
+
+    document.getElementById('li-adset-tbody').innerHTML = sortDesc(liCamp, 'spend').map(function (r) {
+      return '<tr><td>' + esc(r.campaign_name) + '</td><td>' + esc(r.ad_set_name) + '</td>' +
+        '<td class="num">' + fmtMoney(r.spend) + '</td>' +
+        '<td class="num">' + fmtInt(r.impressions) + '</td>' +
+        '<td class="num">' + fmtInt(r.clicks) + '</td>' +
+        '<td class="num">' + fmtPct(r.ctr) + '</td>' +
+        '<td class="num">' + fmtMoney(r.cpm) + '</td>' +
+        '<td class="num">' + fmtMoney(r.cpc) + '</td>' +
+        '<td class="num">' + fmtInt(r.engagement_total) + '</td>' +
+        '<td class="num">' + fmtPct(r.engagement_rate) + '</td>' +
+        '<td class="num">' + wowBadge(r.wow_spend_change_pct) + '</td></tr>';
+    }).join('');
+
+    document.getElementById('li-creative-note').innerHTML = '<p class="note">' + esc(liCreative.length + ' ads.') + '</p>';
+    document.getElementById('li-creative-tbody').innerHTML = sortDesc(liCreative, 'spend').map(function (r) {
+      return '<tr><td>' + esc(r.ad_name) + '</td><td>' + esc(r.ad_set_name) + '</td><td>' + esc(r.ad_headline) + '</td>' +
+        '<td class="num">' + fmtMoney(r.spend) + '</td>' +
+        '<td class="num">' + fmtInt(r.impressions) + '</td>' +
+        '<td class="num">' + fmtInt(r.clicks) + '</td>' +
+        '<td class="num">' + fmtPct(r.ctr) + '</td>' +
+        '<td class="num">' + fmtInt(r.engagement_total) + '</td>' +
+        '<td class="num">' + wowBadge(r.wow_spend_change_pct) + '</td></tr>';
+    }).join('');
+
+    // ---- Demographics (dynamic segment blocks) ----
+    var segTypes = [];
+    liDemo.forEach(function (r) { if (segTypes.indexOf(r.segment_type) === -1) segTypes.push(r.segment_type); });
+    var navExtraHtml = '';
+    var containerHtml = '';
+    segTypes.forEach(function (segType, i) {
+      var segRows = liDemo.filter(function (r) { return r.segment_type === segType; });
+      var totalImpr = sumField(segRows, 'impressions');
+      var totalClicks = sumField(segRows, 'clicks');
+      var rowsHtml = sortDesc(segRows, 'impressions').map(function (r) {
+        var pctImpr = safeDiv(r.impressions, totalImpr);
+        var pctClicks = safeDiv(r.clicks, totalClicks);
+        return '<tr><td>' + esc(r.segment_value) + '</td>' +
+          '<td class="num">' + fmtInt(r.impressions) + '</td>' +
+          '<td class="num">' + fmtPct(pctImpr !== null ? pctImpr * 100 : null) + '</td>' +
+          '<td class="num">' + fmtInt(r.clicks) + '</td>' +
+          '<td class="num">' + fmtPct(pctClicks !== null ? pctClicks * 100 : null) + '</td>' +
+          '<td class="num">' + fmtPct(r.ctr) + '</td>' +
+          '<td class="num">' + fmtInt(r.conversions) + '</td>' +
+          '<td class="num">' + fmtPct(r.conversion_rate) + '</td></tr>';
+      }).join('');
+      var note = '';
+      if (segType === 'Job Title') {
+        note = 'Note: LinkedIn labeled this block "Job Title Segment" in the source export, but its values (Engineering, Sales, Operations...) are job functions, not titles. Shown as exported, not corrected.';
+      }
+      var anchor = 'li-demo-' + i;
+      navExtraHtml += '<a href="#' + anchor + '">' + esc(segType) + '</a>';
+      containerHtml +=
+        '<section id="' + anchor + '" class="topic">' +
+        '<h3>' + esc(segType) + '</h3>' +
+        (note ? '<p class="note">' + esc(note) + '</p>' : '') +
+        '<div class="table-scroll"><table><thead><tr>' +
+        '<th>Segment Value</th><th class="num">Impressions</th><th class="num">% of Total Impr.</th>' +
+        '<th class="num">Clicks</th><th class="num">% of Total Clicks</th><th class="num">CTR</th>' +
+        '<th class="num">Conversions</th><th class="num">Conv. Rate</th>' +
+        '</tr></thead><tbody>' + rowsHtml + '</tbody></table></div></section>';
+    });
+    document.getElementById('li-demo-nav-extra').innerHTML = navExtraHtml;
+    document.getElementById('li-demographics-container').innerHTML = containerHtml;
+
+    // ================= CHATGPT ADS =================
+    var cgCards = haveCg ? [
+      kpiCard('Spend', fmtMoney(cgNow.spend), cgWow.spend),
+      kpiCard('Impressions', fmtInt(cgNow.impressions), cgWow.impressions),
+      kpiCard('Clicks', fmtInt(cgNow.clicks), cgWow.clicks),
+      kpiCard('CTR', fmtPct(cgCtrPct), cgWow.ctr),
+      kpiCard('CPC', fmtMoney(cgCpc), cgWow.cpc),
+      kpiCard('CPM', fmtMoney(cgCpm), cgWow.cpm),
+      kpiCard('Conversions', fmtInt(cgNow.conversions), cgWow.conversions, cgNow.conversions ? undefined : 'None reported'),
+      kpiCard('Cost / Conversion', fmtMoney(cgCostPerConv), cgWow.cost_per_conv, cgNow.conversions ? undefined : 'No conversions to divide by')
+    ].join('') : '';
+    var cgNote = !haveCg
+      ? 'No ChatGPT Ads data for this week. ChatGPT Ads tracking starts with the week of Oct 7 – 13, 2026; earlier weeks were not backfilled.'
+      : (!cgPriorAvail ? 'First tracked week for ChatGPT Ads, so there is no prior week to compare against and WoW is blank. This is expected, not a bug. CTR, CPC and CPM are calculated from spend, impressions and clicks.' : '');
+    document.getElementById('chatgpt-totals-grid').innerHTML = cgCards;
+    document.getElementById('chatgpt-totals-note').innerHTML = !haveCg ? '<p class="note">' + esc(cgNote) + '</p>' : '';
+    document.getElementById('cg-totals-grid').innerHTML = cgCards;
+    document.getElementById('cg-note').innerHTML = cgNote ? '<p class="note">' + esc(cgNote) + '</p>' : '';
+    document.getElementById('cg-asof').textContent = haveCg
+      ? 'Data as of ' + fmtDay(weekEnd) + ' (reporting week ' + weekLabel(weekStart, weekEnd) + ').' + (snapshotModifiedIso ? ' Snapshot ' + fmtLastUpdated(snapshotModifiedIso).replace('Last updated: ', 'saved ') + '.' : '')
+      : 'No ChatGPT Ads data for ' + weekLabel(weekStart, weekEnd) + '.';
+
+    function cgEmptyRow(cols, msg) { return '<tr><td colspan="' + cols + '" class="note">' + esc(msg) + '</td></tr>'; }
+    document.getElementById('cg-adgroup-tbody').innerHTML = cgGroups.length ? sortDesc(cgGroups, 'spend').map(function (r) {
+      return '<tr><td>' + esc(r.campaign_name) + '</td><td>' + esc(r.ad_group_name) + '</td>' +
+        '<td><span class="' + statusClass(r.ad_group_status) + '">' + esc(r.ad_group_status) + '</span></td>' +
+        '<td>' + esc(r.billing_event_type) + '</td>' +
+        '<td class="num">' + fmtMoney(r.max_bid) + '</td>' +
+        '<td class="num">' + fmtMoney(r.spend) + '</td>' +
+        '<td class="num">' + fmtInt(r.impressions) + '</td>' +
+        '<td class="num">' + fmtInt(r.clicks) + '</td>' +
+        '<td class="num">' + fmtPct(r.ctr) + '</td>' +
+        '<td class="num">' + fmtMoney(r.cpc) + '</td>' +
+        '<td class="num">' + fmtMoney(r.cpm) + '</td>' +
+        '<td class="num">' + fmtInt(r.conversions) + '</td>' +
+        '<td class="num">' + wowBadge(r.wow_spend_change_pct) + '</td></tr>';
+    }).join('') : cgEmptyRow(13, 'No ChatGPT Ads ad group data for this week.');
+
+    document.getElementById('cg-ad-note').innerHTML = cgAds.length ? '<p class="note">' + esc(cgAds.length + ' ads.') + '</p>' : '';
+    document.getElementById('cg-ad-tbody').innerHTML = cgAds.length ? sortDesc(cgAds, 'spend').map(function (r) {
+      return '<tr><td>' + esc(r.ad_name) + '</td><td>' + esc(r.ad_group_name) + '</td>' +
+        '<td><span class="' + statusClass(r.ad_status) + '">' + esc(r.ad_status) + '</span></td>' +
+        '<td>' + esc(r.review_status) + '</td>' +
+        '<td>' + esc(r.ad_title) + '</td>' +
+        '<td><div class="cell-clip">' + esc(r.ad_copy) + '</div></td>' +
+        '<td class="num">' + fmtMoney(r.spend) + '</td>' +
+        '<td class="num">' + fmtInt(r.impressions) + '</td>' +
+        '<td class="num">' + fmtInt(r.clicks) + '</td>' +
+        '<td class="num">' + fmtPct(r.ctr) + '</td>' +
+        '<td class="num">' + fmtMoney(r.cpc) + '</td>' +
+        '<td class="num">' + fmtMoney(r.cpm) + '</td>' +
+        '<td class="num">' + fmtInt(r.conversions) + '</td>' +
+        '<td class="num">' + wowBadge(r.wow_spend_change_pct) + '</td></tr>';
+    }).join('') : cgEmptyRow(14, 'No ChatGPT Ads ad data for this week.');
+
+    initSortableTables();
+  }
+
+  // ---------------- MCP boot / fetch plumbing ----------------
+
+  function callTool(tool, input) {
+    return mcp.callTool(SERVER, tool, input);
+  }
+
+  function searchByTitle(title, parentId) {
+    var query = "title = '" + title.replace(/'/g, "\\'") + "' and parentId = '" + parentId + "'";
+    return callTool('search_files', { query: query }).then(function (result) {
+      var payload = result.payload;
+      if (!payload || !payload.files || !payload.files.length) {
+        throw { code: 'not_found', message: 'File not found: ' + title };
+      }
+      return payload.files[0];
+    });
+  }
+
+  function downloadJson(fileId) {
+    return callTool('download_file_content', { fileId: fileId }).then(function (result) {
+      var payload = result.payload;
+      var b64 = payload && payload.content;
+      if (!b64) throw { code: 'bad_response', message: 'No content returned for file ' + fileId };
+      var jsonText = decodeURIComponent(Array.prototype.map.call(atob(b64), function (c) {
+        return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+      }).join(''));
+      return JSON.parse(jsonText);
+    });
+  }
+
+  function loadWeek(filename) {
+    document.getElementById('week-select').disabled = true;
+    clearBanner();
+    return searchByTitle(filename, HISTORY_FOLDER_ID).then(function (file) {
+      return downloadJson(file.id).then(function (unified) {
+        return { unified: unified, modifiedTime: file.modifiedTime };
+      });
+    }).then(function (res) {
+      renderWeek(res.unified, gaHistoryCache, res.modifiedTime);
+      haveRenderedOnce = true;
+      document.getElementById('week-select').disabled = false;
+    }).catch(function (err) {
+      document.getElementById('week-select').disabled = false;
+      var msg = (err && err.message) || 'Could not load that week’s data.';
+      showBanner('error', 'Couldn’t load this week’s snapshot: ' + msg +
+        (haveRenderedOnce ? ' (showing the last week that loaded successfully)' : ''));
+    });
+  }
+
+  function boot() {
+    if (!window.claude || typeof window.claude.use !== 'function') {
+      document.getElementById('week-range').textContent = '';
+      showBanner('error', 'This dashboard needs Google Drive access to load data, which isn’t available in this view.');
+      return;
+    }
+    window.claude.use('mcp').then(function (ns) {
+      mcp = ns;
+      if (!mcp) {
+        document.getElementById('week-range').textContent = '';
+        showBanner('error', 'This dashboard needs Google Drive access to load data. Ask the page owner to check the connector is granted.');
+        return;
+      }
+      // Fetch index.json + google-ads-history.json in parallel; history is cached for the whole session.
+      var indexPromise = searchByTitle('index.json', HISTORY_FOLDER_ID).then(function (f) { return downloadJson(f.id); });
+      var historyPromise = searchByTitle('google-ads-history.json', DASHBOARD_SPECS_FOLDER_ID)
+        .then(function (f) { return downloadJson(f.id); })
+        .catch(function () { return []; }); // GA WoW just degrades to "no prior week" if this is unavailable
+
+      Promise.all([indexPromise, historyPromise]).then(function (results) {
+        var index = results[0];
+        gaHistoryCache = results[1];
+        var weeks = (index && index.weeks) || [];
+        if (!weeks.length) {
+          showBanner('error', 'No weeks found in index.json.');
+          return;
+        }
+        var select = document.getElementById('week-select');
+        select.innerHTML = '';
+        // Most recent first in the dropdown; index.json itself stays append-only/chronological.
+        weeks.slice().reverse().forEach(function (w) {
+          var opt = document.createElement('option');
+          opt.value = w.filename;
+          opt.textContent = weekLabel(w.start, w.end);
+          select.appendChild(opt);
+        });
+        var current = weeks[weeks.length - 1];
+        select.value = current.filename;
+        select.disabled = false;
+        select.addEventListener('change', function () { loadWeek(select.value); });
+        loadWeek(current.filename);
+      }).catch(function (err) {
+        var msg = (err && err.message) || 'Could not load the week index.';
+        document.getElementById('week-range').textContent = '';
+        showBanner('error', 'Couldn’t load the dashboard: ' + msg);
+      });
+    }).catch(function () {
+      document.getElementById('week-range').textContent = '';
+      showBanner('error', 'This dashboard needs Google Drive access to load data, which isn’t available in this view.');
+    });
+  }
+
+  // ---------------- Trends tab (static weekly totals; update TRENDS each week) ----------------
+  var TRENDS = [{"start":"2026-08-26","end":"2026-09-01","li_spend":25505.22,"li_impr":206009.0,"li_clicks":2158.0,"li_eng":6349.0,"li_conv":0.0,"ga_spend":6224.53,"ga_impr":21825.0,"ga_clicks":1263.0,"ga_conv":418.71,"note":"LinkedIn figures taken from the next week's compare columns (stored 08-26 snapshot under-reports spend)"},{"start":"2026-09-02","end":"2026-09-08","li_spend":28004.69,"li_impr":248869.0,"li_clicks":2643.0,"li_eng":7078.0,"li_conv":7.0,"ga_spend":7313.51,"ga_impr":22338.0,"ga_clicks":1284.0,"ga_conv":480.37},{"start":"2026-09-09","end":"2026-09-15","li_spend":31883.59,"li_impr":224274.0,"li_clicks":3582.0,"li_eng":5141.0,"li_conv":4.0,"ga_spend":7372.89,"ga_impr":25484.0,"ga_clicks":1475.0,"ga_conv":537.97},{"start":"2026-09-16","end":"2026-09-22","li_spend":29761.71,"li_impr":199811.0,"li_clicks":3410.0,"li_eng":4461.0,"li_conv":3.0,"ga_spend":6987.17,"ga_impr":29389.0,"ga_clicks":1590.0,"ga_conv":514.0},{"start":"2026-09-23","end":"2026-09-29","li_spend":22557.57,"li_impr":173583.0,"li_clicks":2248.0,"li_eng":3213.0,"li_conv":7.0,"ga_spend":6451.29,"ga_impr":23344.0,"ga_clicks":1490.0,"ga_conv":453.5},{"start":"2026-09-30","end":"2026-10-06","li_spend":21472.57,"li_impr":165903.0,"li_clicks":1647.0,"li_eng":2691.0,"li_conv":0.0,"ga_spend":6927.77,"ga_impr":25927.0,"ga_clicks":1467.0,"ga_conv":418.0},{"start":"2026-10-07","end":"2026-10-13","li_spend":20509.24,"li_impr":144686.0,"li_clicks":1653.0,"li_eng":2554.0,"li_conv":0,"ga_spend":6905.64,"ga_impr":24590.0,"ga_clicks":1517.0,"ga_conv":467.99,"cg_spend":591.34,"cg_impr":27624.0,"cg_clicks":212.0,"cg_conv":0}];
+  function renderTrends() {
+    var rows = TRENDS.map(function (t) {
+      var cg = t.cg_spend || 0, cgI = t.cg_impr || 0, cgC = t.cg_clicks || 0, cgV = t.cg_conv || 0;
+      var spend = t.li_spend + t.ga_spend + cg, impr = t.li_impr + t.ga_impr + cgI, clicks = t.li_clicks + t.ga_clicks + cgC, conv = t.li_conv + t.ga_conv + cgV;
+      return { label: weekLabel(t.start, t.end).replace(/, 2026$/, ''), spend: spend, li: t.li_spend, ga: t.ga_spend, cg: cg, hasCg: t.cg_spend !== undefined, impr: impr, clicks: clicks, conv: conv,
+               ctr: safeDiv(clicks, impr) * 100, cpc: safeDiv(spend, clicks), eng: t.li_eng };
+    });
+    var last = rows[rows.length - 1], prev = rows[rows.length - 2];
+    function w(k) { return wowCalc(last[k], prev[k]); }
+    document.getElementById('trends-wow').innerHTML = [
+      kpiCard('Total spend', fmtMoney(last.spend), w('spend'), 'latest week vs prior'),
+      kpiCard('LinkedIn spend', fmtMoney(last.li), w('li')),
+      kpiCard('Google Ads spend', fmtMoney(last.ga), w('ga'))
+    ].concat(last.hasCg ? [kpiCard('ChatGPT Ads spend', fmtMoney(last.cg), w('cg'), prev.hasCg ? undefined : 'first tracked week')] : []).concat([
+      kpiCard('Impressions', fmtInt(last.impr), w('impr')),
+      kpiCard('Clicks', fmtInt(last.clicks), w('clicks')),
+      kpiCard('CTR', fmtPct(last.ctr), wowCalc(last.ctr, prev.ctr)),
+      kpiCard('Conversions', fmtInt(last.conv), w('conv'))
+    ]).join('');
+    function chart(title, series, fmt, stacked) {
+      var W = 420, H = 220, L = 52, R = 12, Tp = 24, B = 44, n = rows.length;
+      var max = 0;
+      rows.forEach(function (r, i) { var s = 0; series.forEach(function (se) { s = stacked ? s + r[se.k] : Math.max(s, r[se.k]); }); max = Math.max(max, s); });
+      max = max * 1.1 || 1;
+      var bw = (W - L - R) / n, svg = '<svg viewBox="0 0 ' + W + ' ' + H + '" style="width:100%;height:auto" role="img" aria-label="' + esc(title) + '">';
+      for (var g = 0; g <= 4; g++) {
+        var y = Tp + (H - Tp - B) * (1 - g / 4), v = max * g / 4;
+        svg += '<line x1="' + L + '" x2="' + (W - R) + '" y1="' + y + '" y2="' + y + '" stroke="var(--border)"/><text x="' + (L - 6) + '" y="' + (y + 4) + '" text-anchor="end" font-size="10" fill="var(--text-muted)">' + fmt(v) + '</text>';
+      }
+      rows.forEach(function (r, i) {
+        var x = L + i * bw, acc = 0;
+        series.forEach(function (se, j) {
+          var val = r[se.k], h = (H - Tp - B) * val / max;
+          if (stacked) { svg += '<rect x="' + (x + bw * 0.18) + '" y="' + (H - B - acc - h) + '" width="' + (bw * 0.64) + '" height="' + h + '" fill="' + se.c + '"><title>' + esc(r.label + ' · ' + se.n + ': ' + fmt(val)) + '</title></rect>'; acc += h; }
+          else { var bw2 = bw * 0.72 / series.length; svg += '<rect x="' + (x + bw * 0.14 + j * bw2) + '" y="' + (H - B - h) + '" width="' + (bw2 - 2) + '" height="' + h + '" fill="' + se.c + '"><title>' + esc(r.label + ' · ' + se.n + ': ' + fmt(val)) + '</title></rect>'; }
+        });
+        svg += '<text x="' + (x + bw / 2) + '" y="' + (H - B + 14) + '" text-anchor="middle" font-size="9.5" fill="var(--text-muted)">' + esc(r.label.split(' – ')[0]) + '</text>';
+      });
+      var leg = series.map(function (se) { return '<span style="margin-right:12px"><span style="display:inline-block;width:10px;height:10px;background:' + se.c + ';border-radius:2px;margin-right:4px"></span>' + se.n + '</span>'; }).join('');
+      return '<div class="kpi-card"><div class="kpi-label">' + esc(title) + '</div>' + svg + '</svg><div class="kpi-sub">' + leg + '</div></div>';
+    }
+    var C1 = '#2563eb', C2 = '#f59e0b', C3 = '#0d9488';
+    document.getElementById('trends-charts').innerHTML =
+      chart('Spend by platform', [{ k: 'li', n: 'LinkedIn', c: C1 }, { k: 'ga', n: 'Google Ads', c: C2 }, { k: 'cg', n: 'ChatGPT Ads', c: C3 }], function (v) { return '$' + Math.round(v).toLocaleString('en-US'); }, true) +
+      chart('Impressions', [{ k: 'impr', n: 'Impressions', c: C1 }], function (v) { return Math.round(v / 1000) + 'k'; }, false) +
+      chart('Clicks', [{ k: 'clicks', n: 'Clicks', c: C1 }], function (v) { return Math.round(v).toLocaleString('en-US'); }, false) +
+      chart('Conversions', [{ k: 'conv', n: 'Conversions', c: C2 }], function (v) { return Math.round(v); }, false);
+    document.getElementById('trends-tbody').innerHTML = rows.map(function (r, i) {
+      return '<tr><td>' + esc(r.label) + '</td><td class="num">' + fmtMoney(r.spend) + '</td><td class="num">' + fmtMoney(r.li) + '</td><td class="num">' + fmtMoney(r.ga) + '</td><td class="num">' + (r.hasCg ? fmtMoney(r.cg) : '—') + '</td><td class="num">' + fmtInt(r.impr) + '</td><td class="num">' + fmtInt(r.clicks) + '</td><td class="num">' + fmtPct(r.ctr) + '</td><td class="num">' + fmtInt(r.conv) + '</td><td class="num">' + (i ? wowBadge(wowCalc(r.spend, rows[i - 1].spend)) : '<span class="wow wow-na">—</span>') + '</td></tr>';
+    }).join('');
+  }
+  renderTrends();
+
+  boot();
+})();
+</script>
